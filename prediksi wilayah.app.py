@@ -1,107 +1,174 @@
 import streamlit as st
 import pandas as pd
-import json
+import numpy as np
 import plotly.express as px
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
-st.set_page_config(page_title="Prediksi Iklim SULTENG(1)", layout="wide")
+# ============================================================
+# 1. DATA DEFAULT SULTENG(1)
+# ============================================================
 
-st.title("🌦️ Prediksi Iklim SULTENG(1)")
-st.write("Dashboard untuk upload data Excel, visualisasi, dan prediksi iklim menggunakan Machine Learning.")
+df_default = pd.DataFrame({
+    "tahun": np.arange(2000, 2021),
+    "suhu": np.random.uniform(25, 29, 21),
+    "hujan": np.random.uniform(1200, 2500, 21),
+    "lembap": np.random.uniform(65, 90, 21)
+})
 
-# ===========================
-# GEOJSON SULTENG(1) (EMBED)
-# ===========================
+# ============================================================
+# 2. GEOJSON SULTENG(1) TANPA FILE
+# ============================================================
+
 geojson_sulteng = {
     "type": "FeatureCollection",
-    "features": [
-        {
-            "type": "Feature",
-            "properties": {"NAME": "SULTENG(1)", "id": 1},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [121.0, -1.0],
-                    [122.2, -1.3],
-                    [123.6, -0.9],
-                    [122.8, 0.2],
-                    [121.5, 0.3],
-                    [121.0, -1.0]
-                ]]
-            }
+    "features": [{
+        "type": "Feature",
+        "properties": {"name": "SULTENG(1)"},
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+                [119.80, -1.0],
+                [121.00, -1.0],
+                [121.00, -2.0],
+                [119.80, -2.0],
+                [119.80, -1.0]
+            ]]
         }
-    ]
+    }]
 }
 
-# Upload Data
-st.subheader("📤 Upload Data Excel Harian Iklim")
-uploaded_file = st.file_uploader("Upload file Excel (*.xlsx)", type=["xlsx"])
+# ============================================================
+# 3. UI TEMA BIRU
+# ============================================================
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-    st.success("File berhasil diupload!")
+st.set_page_config(page_title="Dashboard Iklim SULTENG(1)", layout="wide")
 
-    st.subheader("📊 Data Preview")
-    st.dataframe(df)
+st.markdown("""
+    <h1 style='text-align:center;color:#0066CC;'>🌦️ Dashboard Iklim — SULTENG(1)</h1>
+    <p style='text-align:center;font-size:18px;'>
+        Analisis tren iklim, prediksi jangka panjang, dan visualisasi wilayah.
+    </p>
+""", unsafe_allow_html=True)
 
-    # ----------------------------------
-    # VISUALISASI PETA
-    # ----------------------------------
-    st.subheader("🗺️ Peta Wilayah SULTENG(1)")
+# ============================================================
+# 4. OPSIONAL — UPLOAD DATA
+# ============================================================
 
-    fig_map = px.choropleth_mapbox(
-        geojson=geojson_sulteng,
-        locations=[1],
-        featureidkey="properties.id",
-        color=[1],
-        mapbox_style="carto-positron",
-        center={"lat": -0.8, "lon": 122.1},
-        zoom=6,
-        opacity=0.5,
-        color_continuous_scale="Blues"
-    )
-    st.plotly_chart(fig_map, use_container_width=True)
+uploaded = st.file_uploader("Upload data Excel (opsional)", type=["xlsx"])
 
-    # ----------------------------------
-    # MODEL PREDIKSI
-    # ----------------------------------
-    st.subheader("🤖 Prediksi Iklim 10–50 Tahun")
-
-    numeric_cols = df.select_dtypes(include=['int64','float64']).columns.tolist()
-
-    if len(numeric_cols) < 2:
-        st.error("Data minimal harus memiliki ≥2 kolom numerik.")
-    else:
-        target = st.selectbox("Pilih kolom target (misal: suhu, curah hujan)", numeric_cols)
-        fitur = [c for c in numeric_cols if c != target]
-
-        X = df[fitur]
-        y = df[target]
-
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-
-        model = RandomForestRegressor(n_estimators=200)
-        model.fit(X_train, y_train)
-
-        pred = model.predict(X_test)
-
-        st.write("### 🔍 Hasil Prediksi Model")
-        pred_df = pd.DataFrame({"Actual": y_test, "Predicted": pred})
-        st.dataframe(pred_df)
-
-        st.write("### 📈 Prediksi 50 Tahun ke Depan")
-
-        future_years = st.slider("Pilih jumlah tahun prediksi:", 10, 50, 30)
-
-        last_row = df[fitur].iloc[-1:]
-        future_pred = model.predict([last_row.values.flatten()])[0]
-
-        st.metric(f"Prediksi Nilai Iklim {future_years} tahun ke depan", f"{future_pred:.2f}")
-
+if uploaded:
+    df = pd.read_excel(uploaded)
+    st.success("Berhasil memuat data upload!")
 else:
-    st.info("Silakan upload data Excel terlebih dahulu.")
+    df = df_default
+    st.info("Menggunakan data default SULTENG(1).")
 
+# ============================================================
+# 5. TAMPILKAN DATA
+# ============================================================
 
+st.subheader("📊 Data Iklim")
+st.dataframe(df)
+
+# ============================================================
+# 6. GRAFIK TREN
+# ============================================================
+
+st.subheader("📈 Grafik Tren Iklim")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("### Suhu")
+    fig_suhu = px.line(df, x="tahun", y="suhu")
+    st.plotly_chart(fig_suhu, use_container_width=True)
+
+with col2:
+    st.markdown("### Curah Hujan")
+    fig_hujan = px.line(df, x="tahun", y="hujan")
+    st.plotly_chart(fig_hujan, use_container_width=True)
+
+with col3:
+    st.markdown("### Kelembapan")
+    fig_lembap = px.line(df, x="tahun", y="lembap")
+    st.plotly_chart(fig_lembap, use_container_width=True)
+
+# ============================================================
+# 7. MODEL PREDIKSI ML
+# ============================================================
+
+st.subheader("🤖 Prediksi Iklim 2021–2070 (Random Forest)")
+
+model = RandomForestRegressor(n_estimators=300, random_state=42)
+
+X = df[["tahun"]]
+y = df["suhu"]
+
+model.fit(X, y)
+
+tahun_prediksi = np.arange(2021, 2071)
+prediksi = model.predict(tahun_prediksi.reshape(-1, 1))
+
+df_prediksi = pd.DataFrame({
+    "tahun": tahun_prediksi,
+    "prediksi_suhu": prediksi
+})
+
+# ============================================================
+# 8. GRAFIK PREDIKSI
+# ============================================================
+
+fig_pred = px.line(df_prediksi, x="tahun", y="prediksi_suhu",
+                   title="Prediksi Suhu 2021–2070")
+st.plotly_chart(fig_pred, use_container_width=True)
+
+# ============================================================
+# 9. METRIK AKURASI
+# ============================================================
+
+y_pred_train = model.predict(X)
+
+colA, colB, colC = st.columns(3)
+
+with colA:
+    st.metric("RMSE", round(np.sqrt(mean_squared_error(y, y_pred_train)), 3))
+
+with colB:
+    st.metric("MAE", round(mean_absolute_error(y, y_pred_train), 3))
+
+with colC:
+    st.metric("R² Score", round(r2_score(y, y_pred_train), 3))
+
+# ============================================================
+# 10. FITUR DOWNLOAD
+# ============================================================
+
+st.subheader("📥 Download Hasil Prediksi")
+
+df_download = df_prediksi.copy()
+
+st.download_button(
+    label="Download Excel (.xlsx)",
+    data=df_download.to_csv(index=False).encode(),
+    file_name="prediksi_sulteng1.csv",
+    mime="text/csv"
+)
+
+# ============================================================
+# 11. PETA WILAYAH
+# ============================================================
+
+st.subheader("🗺️ Peta Wilayah SULTENG(1)")
+
+fig_map = px.choropleth_mapbox(
+    geojson=geojson_sulteng,
+    locations=["SULTENG(1)"],
+    featureidkey="properties.name",
+    center={"lat": -1.5, "lon": 120.3},
+    mapbox_style="carto-positron",
+    zoom=5,
+    color_discrete_sequence=["blue"]
+)
+
+st.plotly_chart(fig_map, use_container_width=True)
