@@ -129,4 +129,3 @@ st.download_button(
     f"data_{selected_kec}.csv",
     "text/csv"
 )
-
