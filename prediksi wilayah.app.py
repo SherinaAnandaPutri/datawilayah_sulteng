@@ -3,11 +3,13 @@ import pandas as pd
 import json
 import plotly.express as px
 
-st.title("🗺️ Peta Kota Kendari — Sulawesi Tenggara")
+st.set_page_config(page_title="Dashboard Iklim Kendari", layout="wide")
 
-# ================================
-# 1. GEOJSON KENDARI (simplified)
-# ================================
+st.title("📊 Dashboard Analisis & Peta Kota Kendari — Sulawesi Tenggara")
+
+# -----------------------------------------------------------
+# 1. GEOJSON KENDARI (SIMPIFIED – TANPA DOWNLOAD)
+# -----------------------------------------------------------
 kendari_geojson = {
   "type": "FeatureCollection",
   "features": [
@@ -62,28 +64,42 @@ kendari_geojson = {
   ]
 }
 
-# ================================
-# 2. Data contoh (nilai tiap kecamatan)
-# ================================
-df_map = pd.DataFrame({
-    "kecamatan": ["Mandonga","Baruga","Kadia","Wua-Wua","Poasia","Kambu"],
-    "nilai": [10, 20, 30, 40, 50, 60]
-})
+st.header("📤 Upload Data Excel")
 
-# ================================
-# 3. Visualisasi Plotly
-# ================================
-fig = px.choropleth_mapbox(
-    df_map,
-    geojson=kendari_geojson,
-    locations="kecamatan",
-    featureidkey="properties.kecamatan",
-    color="nilai",
-    mapbox_style="carto-positron",
-    zoom=11,
-    center={"lat": -3.97, "lon": 122.51},
-    color_continuous_scale="Viridis",
-    opacity=0.7,
-)
+uploaded_file = st.file_uploader("Unggah file Excel Anda", type=["xlsx"])
 
-st.plotly_chart(fig, use_container_width=True)
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
+    
+    # VALIDASI
+    required_cols = ["kecamatan", "nilai"]
+    if not all(c in df.columns for c in required_cols):
+        st.error("❌ File Excel harus memiliki kolom: **kecamatan** dan **nilai**")
+        st.stop()
+
+    st.success("✔ File berhasil dibaca!")
+    st.write("### 📄 Data Anda:")
+    st.dataframe(df)
+
+    # -----------------------------------------------------------
+    # 2. MENAMPILKAN PETA KENDARI BERDASARKAN DATA
+    # -----------------------------------------------------------
+    st.header("🗺️ Peta Kota Kendari Berdasarkan Data Excel")
+
+    fig = px.choropleth_mapbox(
+        df,
+        geojson=kendari_geojson,
+        locations="kecamatan",
+        featureidkey="properties.kecamatan",
+        color="nilai",
+        mapbox_style="carto-positron",
+        zoom=11,
+        center={"lat": -3.97, "lon": 122.51},
+        color_continuous_scale="Viridis",
+        opacity=0.7
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+else:
+    st.info("⬆ Silakan upload file Excel untuk memulai.")
