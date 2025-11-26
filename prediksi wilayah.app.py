@@ -11,13 +11,13 @@ st.set_page_config(page_title="📊 Dashboard Iklim Kendari", layout="wide")
 # Pada versi awal dashboard (versi sementara), wilayah belum dinamai
 # sehingga diberi placeholder:
 #
-#   Sulteng 1 = Mandonga
-#   Sulteng 2 = Baruga
-#   Sulteng 3 = Kadia
-#   Sulteng 4 = Wua-Wua
-#   Sulteng 5 = Poasia
-#   Sulteng 6 = Kambu
-#   Sulteng 7 = Abeli (opsional)
+#   Mandonga
+#   Baruga
+#   Kadia
+#   Wua-Wua
+#   Poasia
+#   Kambu
+#   Abeli (opsional)
 #
 # Sekarang seluruh placeholder sudah diganti dengan NAMA ASLI kecamatan
 # di Kota Kendari. Tidak ada lagi penggunaan Sulteng 1–7.
@@ -129,3 +129,4 @@ st.download_button(
     f"data_{selected_kec}.csv",
     "text/csv"
 )
+
