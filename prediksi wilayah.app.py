@@ -1,4 +1,4 @@
-# app.py
+# app.py (perbaikan: tidak memakai mean_squared_error(..., squared=False))
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -25,7 +25,6 @@ st.write("Default data otomatis tersedia untuk 7 wilayah. Kamu bisa mengganti da
 # --------------------------
 # 1) GeoJSON embedded (7 wilayah simplified)
 # --------------------------
-# Simple polygons placed roughly across the region — simplified for display only.
 geojson_multi = {
     "type": "FeatureCollection",
     "features": [
@@ -150,7 +149,6 @@ with tab2:
 with tab3:
     st.header("Prediksi 2021–2070 per Wilayah (RandomForest)")
 
-    # user selects target variable to predict (we'll predict suhu/hujan/lembap separately)
     pred_target = st.selectbox("Pilih target prediksi", ["suhu","hujan","lembap"], index=0)
     n_estimators = st.slider("Jumlah pohon RandomForest", 50, 500, 200, step=50)
     test_size = st.slider("Proporsi test (untuk evaluasi)", 0.05, 0.4, 0.2, step=0.05)
@@ -160,24 +158,22 @@ with tab3:
 
     for r in regions:
         rd = default_data[r].copy()
-        # simple features: tahun (numeric). Could be extended.
         X = rd[["tahun"]].values
         y = rd[pred_target].values
-        # if too few rows, skip
         if len(rd) < 6:
             st.warning(f"{r}: data terlalu sedikit ({len(rd)} baris), melewatkan prediksi.")
             continue
         Xtr, Xts, ytr, yts = train_test_split(X, y, test_size=test_size, random_state=42)
         model = RandomForestRegressor(n_estimators=n_estimators, random_state=42)
         model.fit(Xtr, ytr)
-        # eval on test
         ypred_test = model.predict(Xts)
-        rmse = mean_squared_error(yts, ypred_test, squared=False)
+
+        # Perbaikan: hitung RMSE manual (compatibility across sklearn versions)
+        rmse = np.sqrt(mean_squared_error(yts, ypred_test))
         mae = mean_absolute_error(yts, ypred_test)
         r2 = r2_score(yts, ypred_test) if len(np.unique(yts))>1 else float("nan")
         metrics_summary.append({"region":r, "rmse":rmse, "mae":mae, "r2":r2})
 
-        # predict 2021-2070
         years = np.arange(2021, 2071)
         ypred = model.predict(years.reshape(-1,1))
         dfp = pd.DataFrame({"region": r, "tahun": years, f"pred_{pred_target}": ypred})
@@ -195,7 +191,6 @@ with tab3:
         st.write(df_all_preds[df_all_preds["region"]==chosen].reset_index(drop=True))
 
         st.subheader("Grafik Prediksi (semua wilayah)")
-        # show interactive line for all regions
         fig_preds = px.line(df_all_preds, x="tahun", y=f"pred_{pred_target}", color="region",
                             title=f"Prediksi {pred_target} 2021–2070 (per wilayah)")
         st.plotly_chart(fig_preds, use_container_width=True)
@@ -213,7 +208,6 @@ with tab4:
         csv = df_all_preds.to_csv(index=False)
         st.download_button("🔽 Download CSV prediksi semua wilayah", csv, file_name="prediksi_sulteng_multi_2021_2070.csv", mime="text/csv")
 
-        # Excel
         towrite = io.BytesIO()
         with pd.ExcelWriter(towrite, engine="xlsxwriter") as writer:
             for r in regions:
