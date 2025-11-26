@@ -3,103 +3,71 @@ import pandas as pd
 import json
 import plotly.express as px
 
-st.set_page_config(page_title="Dashboard Iklim Kendari", layout="wide")
+st.set_page_config(page_title="Peta Sulawesi Tenggara – Kendari", layout="wide")
 
-st.title("📊 Dashboard Analisis & Peta Kota Kendari — Sulawesi Tenggara")
-
-# -----------------------------------------------------------
-# 1. GEOJSON KENDARI (SIMPIFIED – TANPA DOWNLOAD)
-# -----------------------------------------------------------
-kendari_geojson = {
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {"kecamatan": "Mandonga"},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[122.496, -3.968],[122.508, -3.968],[122.508, -3.957],[122.496, -3.957],[122.496, -3.968]]]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {"kecamatan": "Baruga"},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[122.485, -3.975],[122.496, -3.975],[122.496, -3.963],[122.485, -3.963],[122.485, -3.975]]]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {"kecamatan": "Kadia"},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[122.500, -3.975],[122.510, -3.975],[122.510, -3.965],[122.500, -3.965],[122.500, -3.975]]]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {"kecamatan": "Wua-Wua"},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[122.496, -3.985],[122.510, -3.985],[122.510, -3.975],[122.496, -3.975],[122.496, -3.985]]]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {"kecamatan": "Poasia"},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[122.520, -3.980],[122.535, -3.980],[122.535, -3.965],[122.520, -3.965],[122.520, -3.980]]]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {"kecamatan": "Kambu"},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[122.510, -3.990],[122.525, -3.990],[122.525, -3.975],[122.510, -3.975],[122.510, -3.990]]]
-      }
-    }
-  ]
-}
+st.title("🗺️ Dashboard Peta Kota Kendari – Sulawesi Tenggara")
 
 st.header("📤 Upload Data Excel")
+file = st.file_uploader("Unggah file Excel Anda", type=["xlsx"])
 
-uploaded_file = st.file_uploader("Unggah file Excel Anda", type=["xlsx"])
+# ======================
+# Load GeoJSON Kendari
+# ======================
+@st.cache_data
+def load_geojson():
+    with open("geojson_kendari.json", "r", encoding="utf-8") as f:
+        return json.load(f)
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-    
-    # VALIDASI
-    required_cols = ["kecamatan", "nilai"]
-    if not all(c in df.columns for c in required_cols):
-        st.error("❌ File Excel harus memiliki kolom: **kecamatan** dan **nilai**")
-        st.stop()
+geojson = load_geojson()
 
-    st.success("✔ File berhasil dibaca!")
-    st.write("### 📄 Data Anda:")
+
+# ======================
+# Jika file Excel di-upload
+# ======================
+if file:
+    df = pd.read_excel(file)
+
+    st.subheader("📄 Data yang Diunggah")
     st.dataframe(df)
 
-    # -----------------------------------------------------------
-    # 2. MENAMPILKAN PETA KENDARI BERDASARKAN DATA
-    # -----------------------------------------------------------
-    st.header("🗺️ Peta Kota Kendari Berdasarkan Data Excel")
+    # normalisasi kolom
+    kolom = [c.lower().strip() for c in df.columns]
 
+    def cari_kolom(target, kolom):
+        for c in kolom:
+            if target in c:
+                return c
+        return None
+
+    kol_kecamatan = cari_kolom("kecamatan", kolom)
+    kol_nilai = cari_kolom("nilai", kolom)
+
+    if kol_kecamatan is None or kol_nilai is None:
+        st.error("❌ File Excel harus memiliki kolom yang berisi teks 'kecamatan' dan 'nilai'.")
+        st.stop()
+
+    df.columns = kolom
+    df = df[[kol_kecamatan, kol_nilai]]
+    df.columns = ["kecamatan", "nilai"]
+
+    st.success("✅ Kolom berhasil dibaca!")
+
+    st.subheader("🌍 Peta Kota Kendari (Choropleth)")
     fig = px.choropleth_mapbox(
         df,
-        geojson=kendari_geojson,
+        geojson=geojson,
         locations="kecamatan",
-        featureidkey="properties.kecamatan",
+        featureidkey="properties.Kecamatan",
         color="nilai",
-        mapbox_style="carto-positron",
-        zoom=11,
-        center={"lat": -3.97, "lon": 122.51},
         color_continuous_scale="Viridis",
-        opacity=0.7
+        mapbox_style="carto-positron",
+        zoom=10,
+        center={"lat": -3.995, "lon": 122.518},
+        opacity=0.7,
+        labels={'nilai': 'Nilai'},
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.info("⬆ Silakan upload file Excel untuk memulai.")
+    st.info("Silakan unggah file Excel untuk melanjutkan.")
