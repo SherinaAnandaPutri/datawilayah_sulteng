@@ -2,130 +2,82 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+from io import BytesIO
+import openpyxl
 
-st.set_page_config(page_title="📊 Dashboard Iklim Kendari", layout="wide")
+# Judul Dashboard
+st.title("🌦️ Prediksi Iklim di Wilayah Indonesia dengan Machine Learning")
+st.write("Upload data harian untuk melatih model dan memprediksi iklim 10–50 tahun ke depan.")
 
-# ======================================================================
-# PENJELASAN Riwayat Nama:
-#
-# Pada versi awal dashboard (versi sementara), wilayah belum dinamai
-# sehingga diberi placeholder:
-#
-#   Mandonga
-#   Baruga
-#   Kadia
-#   Wua-Wua
-#   Poasia
-#   Kambu
-#   Abeli (opsional)
-#
-# Sekarang seluruh placeholder sudah diganti dengan NAMA ASLI kecamatan
-# di Kota Kendari. Tidak ada lagi penggunaan Sulteng 1–7.
-# Dokumentasi ini hanya untuk menghindari kebingungan versi lama.
-# ======================================================================
+# Upload Data
+uploaded_file = st.file_uploader("Upload file CSV", type=["csv"])
 
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    st.subheader("Preview Data")
+    st.dataframe(df.head())
 
-# ============================
-# 1. Daftar Kecamatan
-# ============================
-kecamatans = ["Mandonga", "Baruga", "Kadia", "Wua-Wua", "Poasia", "Kambu"]
+    # Cek kolom wajib
+    required_cols = ["temperature", "humidity", "rainfall"]
+    if all(col in df.columns for col in required_cols):
 
+        # Visualisasi Data
+        fig = px.line(df[required_cols], title="Tren Variabel Iklim")
+        st.plotly_chart(fig)
 
-# ============================
-# 2. Lokasi Koordinat Marker Map
-# (bukan polygon, agar ringan dan tidak error)
-# ============================
-lokasi_map = {
-    "Mandonga": [-3.9673, 122.5148],
-    "Baruga": [-3.9909, 122.5313],
-    "Kadia": [-3.9823, 122.5075],
-    "Wua-Wua": [-3.9952, 122.5150],
-    "Poasia": [-4.0163, 122.5590],
-    "Kambu": [-3.9877, 122.5321],
-}
+        # Persiapan Data
+        X = df.drop("rainfall", axis=1)
+        y = df["rainfall"]
 
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
 
-# ============================
-# 3. Membuat Data Iklim Otomatis
-# (Tidak perlu upload Excel)
-# ============================
-def generate_data(n=365):
-    np.random.seed(42)
-    return pd.DataFrame({
-        "Tanggal": pd.date_range("2024-01-01", periods=n, freq="D"),
-        "Tavg": np.random.uniform(25, 31, n),
-        "Tmin": np.random.uniform(23, 28, n),
-        "Tmax": np.random.uniform(28, 35, n),
-        "Kelembaban": np.random.uniform(60, 95, n),
-        "Curah_Hujan": np.random.uniform(0, 30, n),
-        "Kecepatan_Angin": np.random.uniform(1, 6, n),
-    })
+        # Model
+        model = RandomForestRegressor(n_estimators=200, random_state=42)
+        model.fit(X_train, y_train)
 
+        # Evaluasi
+        y_pred = model.predict(X_test)
+        st.subheader("📊 Evaluasi Model")
+        st.write(f"RMSE: {np.sqrt(mean_squared_error(y_test, y_pred)):.4f}")
+        st.write(f"R² Score: {r2_score(y_test, y_pred):.4f}")
 
-# Buat data otomatis untuk tiap kecamatan
-data_kecamatan = {k: generate_data() for k in kecamatans}
+        # Input tahun prediksi
+        st.subheader("🔮 Prediksi Iklim Masa Depan")
+        tahun_prediksi = st.slider("Pilih rentang tahun prediksi", 10, 50, 30)
 
+        # Dummy input masa depan (contoh)
+        future_data = pd.DataFrame({
+            "temperature": np.linspace(df["temperature"].mean(), df["temperature"].mean()+1, tahun_prediksi),
+            "humidity": np.linspace(df["humidity"].mean(), df["humidity"].mean()+1, tahun_prediksi)
+        })
 
-st.title("🌦️ Dashboard Iklim Kota Kendari")
-st.write("Menampilkan data iklim otomatis untuk 6 kecamatan tanpa upload file.")
+        future_pred = model.predict(future_data)
+        future_data["predicted_rainfall"] = future_pred
 
+        st.write(future_data)
 
-# ============================
-# 4. Sidebar
-# ============================
-st.sidebar.header("Pilih Wilayah")
-selected_kec = st.sidebar.selectbox("Kecamatan", kecamatans)
+        # DOWNLOAD EXCEL (Fix)
+        def convert_df_to_excel(df):
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Prediksi Iklim")
+            buffer.seek(0)
+            return buffer
 
+        excel_file = convert_df_to_excel(future_data)
 
-# ============================
-# 5. Menampilkan Data
-# ============================
-st.subheader(f"📌 Data Iklim — {selected_kec}")
-df = data_kecamatan[selected_kec]
-st.dataframe(df, use_container_width=True)
+        st.download_button(
+            label="📥 Download Hasil Prediksi (Excel)",
+            data=excel_file,
+            file_name="prediksi_iklim.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-
-# ============================
-# 6. Grafik Tren
-# ============================
-st.subheader("📈 Grafik Tren Iklim")
-
-var = st.selectbox("Pilih Variabel", ["Tavg", "Tmin", "Tmax", "Kelembaban", "Curah_Hujan", "Kecepatan_Angin"])
-
-fig = px.line(df, x="Tanggal", y=var, title=f"Tren {var} — {selected_kec}", markers=True)
-st.plotly_chart(fig, use_container_width=True)
-
-
-# ============================
-# 7. Peta Marker
-# ============================
-st.subheader("🗺️ Peta Kecamatan Kota Kendari")
-
-map_df = pd.DataFrame({
-    "Kecamatan": kecamatans,
-    "lat": [lokasi_map[k][0] for k in kecamatans],
-    "lon": [lokasi_map[k][1] for k in kecamatans],
-})
-
-fig_map = px.scatter_mapbox(
-    map_df,
-    lat="lat",
-    lon="lon",
-    color="Kecamatan",
-    zoom=11,
-    size_max=18,
-    mapbox_style="open-street-map",
-)
-st.plotly_chart(fig_map, use_container_width=True)
-
-
-# ============================
-# 8. Download Data
-# ============================
-csv = df.to_csv(index=False).encode("utf-8")
-st.download_button(
-    "📥 Download Data Kecamatan",
-    csv,
-    f"data_{selected_kec}.csv",
-    "text/csv"
-)
+    else:
+        st.error("Kolom wajib tidak lengkap. Harus ada: temperature, humidity, rainfall.")
